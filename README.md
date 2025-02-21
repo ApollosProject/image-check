@@ -1,1 +1,6 @@
-`python image-check.py -h`
+```
+python3 -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt
+python image-check.py -h
+```
