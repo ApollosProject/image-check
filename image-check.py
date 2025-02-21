@@ -1,8 +1,9 @@
-# i need to take in a CSV as a command line argument and output a list of the URLs in an array
 import argparse
 import csv
+import xml.etree.ElementTree as ET
 from io import BytesIO
 
+import av
 import requests
 from PIL import Image
 
@@ -10,6 +11,7 @@ parser = argparse.ArgumentParser(description="verify image URLs in a CSV file")
 parser.add_argument("csv_file", type=str, help="the CSV file to verify")
 
 args = parser.parse_args()
+
 
 csv_file = args.csv_file
 urls = []
@@ -19,21 +21,62 @@ with open(csv_file, newline="") as csvfile:
         urls.append(row["url"])
 
 
-def is_valid_image(url):
+def is_valid_avif(url):
     try:
-        # Send a request to the URL
-        response = requests.get(url, stream=True, timeout=5)
-        response.raise_for_status()  # Raise an error for bad responses (4xx, 5xx)
+        response = requests.get(url, timeout=5)
+        response.raise_for_status()
 
-        # Check the Content-Type header
-        if "image" not in response.headers.get("Content-Type", ""):
+        # Check Content-Type
+        if "image/avif" not in response.headers.get("Content-Type", ""):
             return False
 
-        # Try opening the image using PIL
-        Image.open(BytesIO(response.content)).verify()  # Verify does not decode image
-        return True
-    except Exception:
+        # Attempt to decode AVIF using PyAV
+        with av.open(BytesIO(response.content), mode="r") as container:
+            for frame in container.decode(video=0):
+                if frame is not None:
+                    return True
         return False
+    except Exception as e:
+        print(f"Error: {e}")
+        return False
+
+
+def is_valid_svg(url):
+    try:
+        response = requests.get(url, timeout=5)
+        response.raise_for_status()
+
+        # Check Content-Type
+        if "image/svg+xml" not in response.headers.get("Content-Type", ""):
+            return False
+
+        # Parse XML to check validity
+        ET.fromstring(response.text)
+        return True
+    except Exception as e:
+        print(f"Error: {e}")
+        return False
+
+
+def is_valid_image(url):
+    try:
+        response = requests.get(url, stream=True, timeout=5)
+        response.raise_for_status()
+
+        content_type = response.headers.get("Content-Type", "")
+
+        if "image/svg+xml" in content_type:
+            return is_valid_svg(url)
+        elif "image/avif" in content_type:
+            return is_valid_avif(url)
+        elif "image" in content_type:
+            Image.open(BytesIO(response.content)).verify()
+            return True
+    except Exception as e:
+        print(f"Error: {e}")
+        return False
+
+    return False
 
 
 # verify the images are valid
