@@ -6,6 +6,7 @@ from io import BytesIO
 import av
 import requests
 from PIL import Image
+from tqdm import tqdm
 
 parser = argparse.ArgumentParser(description="verify image URLs in a CSV file")
 parser.add_argument("csv_file", type=str, help="the CSV file to verify")
@@ -54,7 +55,7 @@ def is_valid_svg(url):
         ET.fromstring(response.text)
         return True
     except Exception as e:
-        print(f"Error: {e}")
+        print(e)
         return False
 
 
@@ -72,6 +73,8 @@ def is_valid_image(url):
         elif "image" in content_type:
             Image.open(BytesIO(response.content)).verify()
             return True
+        else:
+            print(f"Unsupported Content-Type: {content_type}, URL: {url}")
     except Exception as e:
         print(f"Error: {e}")
         return False
@@ -80,6 +83,10 @@ def is_valid_image(url):
 
 
 # verify the images are valid
-for url in urls:
+invalid_images = []
+for url in tqdm(urls):
     if not is_valid_image(url):
-        print(f"{url} is not a valid image")
+        invalid_images.append(url)
+print("")
+print("Invalid images:")
+print("\n".join(invalid_images))
